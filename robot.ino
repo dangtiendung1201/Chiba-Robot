@@ -2,6 +2,15 @@
 // Engines: D2, D4
 // Arms: D7, D8
 
+// BUTTONS
+// Start engines: Green
+// Stop engines: Blue
+
+// Moving forward, backward: Left joystick
+// Moving left, right: Right joystick
+
+// Arms: R1
+
 // LIBRARY
 #include <Arduino.h>
 #include <Servo.h>
@@ -15,9 +24,12 @@ Studuino board;
 PS2X ps2x;
 
 // CONSTANTS
+// General
+const int generalDelay = 70;
+
+// Arms
 const int armLeftClose = 45;
 const int armLeftOpen = 135;
-const int generalDelay = 70;
 
 const int armRightClose = 135;
 const int armRightOpen = 45;
@@ -29,6 +41,9 @@ byte type = 0;
 byte vibrate = 0;
 
 // Engines
+int forward;
+int turn;
+
 int angle = 70;
 int angle2 = 70;
 
@@ -41,70 +56,93 @@ int dir = 4;
 
 void setup()
 {
-	// Engines
-	board.InitServomotorPort(PORT_D2);
-	board.InitServomotorPort(PORT_D4);
-	board.Servomotor(PORT_D2, 0);
-	board.Servomotor(PORT_D4, 0);
+    // Engines
+    board.InitServomotorPort(PORT_D2);
+    board.InitServomotorPort(PORT_D4);
+    board.Servomotor(PORT_D2, 0);
+    board.Servomotor(PORT_D4, 0);
 
-	// Arms
-	board.InitServomotorPort(PORT_D7);
-	board.InitServomotorPort(PORT_D8);
+    // Arms
+    board.InitServomotorPort(PORT_D7);
+    board.InitServomotorPort(PORT_D8);
 
-	// Serial
-	Serial.begin(9600);
+    // Serial
+    Serial.begin(9600);
 
-	// Controller
-	error = ps2x.config_gamepad(13, 11, 10, 12, true, true);
+    // Controller
+    error = ps2x.config_gamepad(13, 11, 10, 12, true, true);
 }
 
+// Turn on the robot
+void turnOn()
+{
+    // If green (triangle) button is pressed, the robot will move
+    if (ps2x.ButtonPressed(PSB_GREEN))
+    {
+        stop = 0;
+    }
+}
+
+// Turn off the robot
+void turnOff()
+{
+    // If blue (cross) button is pressed, the robot will stop
+    if (ps2x.ButtonPressed(PSB_BLUE))
+    {
+        stop = 1;
+    }
+}
+
+void moveArms()
+{
+    // While pressing red button, the arm will move from 45 to 135 degrees
+    if (ps2x.Button(PSB_R1))
+    {
+        board.Servomotor(PORT_D7, armLeftClose);
+        board.Servomotor(PORT_D8, armRightClose);
+    }
+    else
+    {
+        board.Servomotor(PORT_D7, armLeftOpen);
+        board.Servomotor(PORT_D8, armRightOpen);
+    }
+}
+
+void moveRobot()
+{
+    forward = ps2x.Analog(PSS_LY) - 128;
+    turn = ps2x.Analog(PSS_RX) - 128;
+
+    // If the robot is stopped, the engines will be stopped
+    if (stop == 1)
+    {
+        angle = angle0;
+        angle2 = angle20;
+        board.Servomotor(PORT_D2, 0);
+        board.Servomotor(PORT_D4, 0);
+    }
+    // Otherwise, the robot will move
+    else
+    {
+        angle = angle0 - forward / 10 + turn / 10;
+        angle2 = angle20 + forward / 10 + turn / 10;
+        board.Servomotor(PORT_D2, angle);
+        board.Servomotor(PORT_D4, angle2);
+    }
+}
 void loop()
 {
-	ps2x.read_gamepad(false, vibrate); // read controller
+    ps2x.read_gamepad(false, vibrate); // read controller
 
-	// If green (triangle) button is pressed, the robot will move
-	if (ps2x.ButtonPressed(PSB_GREEN))
-	{
-		stop = 0;
-	}
-	// If blue (cross) button is pressed, the robot will stop
-	else if (ps2x.ButtonPressed(PSB_BLUE))
-	{
-		stop = 1;
-	}
+    // Change the state of robot
+    turnOn();
+    turnOff();
 
-	// While pressing red button, the arm will move from 45 to 135 degrees
-	if (ps2x.Button(PSB_R1))
-	{
-		board.Servomotor(PORT_D7, armLeftClose);
-		board.Servomotor(PORT_D8, armRightClose);
-	}
-	else
-	{
-		board.Servomotor(PORT_D7, armLeftOpen);
-		board.Servomotor(PORT_D8, armRightOpen);
-	}
+    // Move arms
+    moveArms();
 
-	// Moving the robot
-	int forward = ps2x.Analog(PSS_LY) - 128;
-	int turn = ps2x.Analog(PSS_RX) - 128;
+    // Move robot
+    moveRobot();
 
-	// If the robot is stopped, the engines will be stopped
-	if (stop == 1)
-	{
-		angle = angle0;
-		angle2 = angle20;
-		board.Servomotor(PORT_D2, 0);
-		board.Servomotor(PORT_D4, 0);
-	}
-	// Otherwise, the robot will move
-	else
-	{
-		angle = angle0 - forward / 10 + turn / 10;
-		angle2 = angle20 + forward / 10 + turn / 10;
-		board.Servomotor(PORT_D2, angle);
-		board.Servomotor(PORT_D4, angle2);
-	}
-
-	delay(generalDelay);
+    delay(generalDelay);
 }
